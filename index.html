@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10141c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Streaks">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Streaks</title>
+<style>
+:root{--bg:#10141c;--panel:#1a2029;--panel2:#222a35;--line:#2a3340;--text:#e9edf3;--muted:#8a94a6;--accent:#f2b84b;
+--build:#3fc9a0;--quit:#ff6f61;--warn:#f2b84b;--gold:#f2b84b;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sb:env(safe-area-inset-bottom)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;min-height:100dvh}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 16px 8px;padding-top:calc(12px + env(safe-area-inset-top));border-bottom:1px solid var(--line)}
+.brand{font-weight:800;letter-spacing:-.02em;font-size:17px}
+.date{color:var(--muted);font-size:12px;margin-top:1px}
+main{flex:1;padding:8px 16px 110px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);display:flex;padding-bottom:var(--sb);z-index:6}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0 8px;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button .i{font-size:20px;line-height:1.1}nav button.on{color:var(--accent)}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin:18px 0 10px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.eyebrow .dot{width:8px;height:8px;border-radius:50%}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.hcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;position:relative;overflow:hidden}
+.hcard.done{border-color:var(--build)}
+.hcard.slipped{border-color:var(--quit)}
+.hcard .top{display:flex;align-items:center;gap:12px}
+.hcard .emoji{font-size:26px;line-height:1;width:34px;text-align:center;flex:none}
+.hcard .nm{font-weight:700;font-size:16px;line-height:1.2}
+.hcard .sub{color:var(--muted);font-size:12px;margin-top:2px}
+.hcard .streak{margin-left:auto;text-align:right;flex:none}
+.hcard .streak .n{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.hcard .streak .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.flame{color:var(--accent)}
+.act{display:flex;gap:8px;margin-top:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:11px 14px;font-size:15px;font-weight:600;flex:1;text-align:center}
+.btn.build{background:var(--build);color:#0e1218;border-color:var(--build)}
+.btn.build.ghost{background:transparent;color:var(--build)}
+.btn.quit{background:var(--quit);color:#0e1218;border-color:var(--quit)}
+.btn.quit.ghost{background:transparent;color:var(--quit)}
+.btn.sm{flex:none;padding:7px 12px;font-size:13px}
+.btn.wide{width:100%}
+.btn.p{background:var(--accent);color:#0e1218;border-color:var(--accent)}
+.btn.d{color:var(--quit);border-color:var(--quit);background:transparent}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.5;pointer-events:none}
+.prog{margin-top:12px}
+.track{height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;position:relative}
+.track .fill{height:100%;border-radius:5px;transition:width .3s}
+.milestones{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.milestones span.hit{color:var(--gold);font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:999px;background:var(--panel2);color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.chip.warn{background:rgba(242,184,75,.15);color:var(--warn)}
+.chip.danger{background:rgba(255,111,97,.15);color:var(--quit)}
+.chip.gold{background:rgba(242,184,75,.15);color:var(--gold)}
+.chip.ok{background:rgba(63,201,160,.15);color:var(--build)}
+.dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:12px}
+.dots i{width:13px;height:13px;border-radius:3px;background:var(--panel2);display:inline-block}
+.dots i.pass{background:var(--build)}
+.dots i.slip{background:var(--quit)}
+.dots i.today{outline:2px solid var(--text);outline-offset:1px}
+.dots i.future{background:var(--panel2);opacity:.4}
+h2.sec{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:22px 0 10px;font-weight:700}
+.empty{color:var(--muted);padding:24px 8px;text-align:center;line-height:1.6}
+label{display:block;font-size:11px;color:var(--muted);margin-top:14px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px;font-size:16px;margin-top:5px;font-family:inherit;color-scheme:dark}
+textarea{resize:vertical;min-height:52px}
+.seg{display:flex;gap:0;margin-top:6px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{flex:1;background:var(--panel2);border:0;color:var(--muted);padding:12px 8px;font-size:14px;font-weight:700}
+.seg button.on.build{background:var(--build);color:#0e1218}
+.seg button.on.quit{background:var(--quit);color:#0e1218}
+.emojibar{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.emojibar button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:20px;display:flex;align-items:center;justify-content:center}
+.emojibar button.on{border-color:var(--accent);background:rgba(242,184,75,.12)}
+#sheet{position:fixed;inset:0;background:rgba(6,8,12,.65);display:none;z-index:20;align-items:flex-end}
+#sheet.open{display:flex}
+#sheet .in{background:var(--panel);width:100%;max-height:92dvh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(28px + var(--sb));border-top:1px solid var(--line)}
+#sheet h2{margin:0 0 4px;font-size:18px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + var(--sb));background:#fff;color:#0e1218;padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:.2s;z-index:30;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.row{display:flex;align-items:center;gap:10px}.sp{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.stat{display:flex;gap:10px;margin-bottom:12px}
+.stat .box{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.stat .box .n{font-family:var(--mono);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .box .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.reasons{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.reasons button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:999px;padding:7px 12px;font-size:13px}
+.reasons button.on{border-color:var(--quit);background:rgba(255,111,97,.12)}
+.hint{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}
+.drag{margin-left:auto;color:var(--muted);cursor:grab;font-size:18px;padding:0 4px;touch-action:none}
+.hcard.dragging{opacity:.5}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.cal .d{aspect-ratio:1;border-radius:6px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cal .d.pass{background:var(--build);color:#0e1218;font-weight:700}
+.cal .d.slip{background:var(--quit);color:#0e1218;font-weight:700}
+.cal .d.today{outline:2px solid var(--text);outline-offset:-2px}
+.cal .hd{font-size:9px;color:var(--muted);text-align:center;text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+ <div class="row"><div><div class="brand">STREAKS</div><div class="date" id="hdate"></div></div><span class="sp"></span><button class="btn sm" style="flex:none" onclick="openSettings()">⚙︎</button></div>
+</header>
+<main id="view"></main>
+<nav id="nav"></nav>
+<div id="sheet" onclick="if(event.target===this)closeSheet()"><div class="in" id="sheetIn"></div></div>
+<div id="toast"></div>
+<script>
+
+/* ===== Streaks — habit tracker ===== */
+const KEY='streaks:v1';
+const MILESTONES=[21,66,90];
+const M_LABEL={21:'Established',66:'Automatic',90:'Locked'};
+const QUIT_REASONS=['Habit','Stress','Boredom','Fatigue','Social','Craving','Trigger','Other'];
+const EMOJIS=['🚭','📵','🌀','💪','🏋️','📖','🧠','🙏','💧','🥗','😴','☀️','🏃','✍️','🧘','💰','🚫','🍺','🎯','⏰','📱','🍔','☕','🎮','🧹','📞','❌','✅'];
+let S={v:1,habits:[],settings:{}};
+let tab='today';
+
+/* ===== Storage: artifact storage if present, else localStorage ===== */
+const store={
+ mode(){return (window.storage&&window.storage.get)?'artifact':'local'},
+ async load(){
+  if(this.mode()==='artifact'){try{const r=await window.storage.get(KEY,false);if(r&&r.value)return JSON.parse(r.value)}catch(e){}return null}
+  try{const s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return null}},
+ async persist(){const s=JSON.stringify(S);
+  if(this.mode()==='artifact'){try{await window.storage.set(KEY,s,false);return}catch(e){}}
+  try{localStorage.setItem(KEY,s)}catch(e){toast('Save failed — storage full')}}
+};
+let saveT;function save(){clearTimeout(saveT);saveT=setTimeout(()=>store.persist(),120)}
+
+/* ===== Date helpers (local day keys, boundary at midnight) ===== */
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const p2=n=>String(n).padStart(2,'0');
+function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function keyToDate(k){const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)}
+function addDays(k,n){const d=keyToDate(k);d.setDate(d.getDate()+n);return dayKey(d)}
+function daysBetween(a,b){return Math.round((keyToDate(b)-keyToDate(a))/86400000)}
+function todayKey(){return dayKey()}
+function fmtDate(d){return (d||new Date()).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})}
+const v=id=>document.getElementById(id).value;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400)}
+function sheet(html){document.getElementById('sheetIn').innerHTML=html;document.getElementById('sheet').classList.add('open')}
+function closeSheet(){document.getElementById('sheet').classList.remove('open')}
+
+/* ===== Habit model =====
+ habit = {id,type:'build'|'quit',name,emoji,start(dayKey),createdAt,
+          log:{dayKey:true}   // build: true=did it; quit: true=slipped
+          cycleStart(dayKey)  // current 21-day cycle anchor; resets on 2nd miss
+          reasons:{dayKey:'Stress'} }
+ Logic:
+  - build: a day PASSES if log[day]===true. A day is a MISS if it's a past day with no true log.
+  - quit:  a day PASSES by default. A day is a SLIP(miss) if log[day]===true.
+  - streak = consecutive passing days ending today (counting back).
+  - cycle = since cycleStart. 2 misses within the active cycle => reset cycleStart to today, streak 0.
+*/
+
+function isPass(h,k){
+ if(h.type==='build')return h.log[k]===true;
+ return h.log[k]!==true; // quit: pass unless slipped
+}
+function isMiss(h,k){
+ // today doesn't count as a miss yet (build habit not yet logged is still pending)
+ if(k===todayKey()&&h.type==='build'&&h.log[k]!==true)return false;
+ if(h.type==='build')return h.log[k]!==true;
+ return h.log[k]===true; // quit slip
+}
+
+// Walk from cycleStart to today, applying the "2 misses within cycle = reset" rule.
+// Returns {cycleStart, streak, missesThisCycle, lastMissKey, totalDays, passDays}
+function evalHabit(h){
+ const today=todayKey();
+ let cs=h.cycleStart||h.start;
+ if(daysBetween(cs,today)<0)cs=today; // safety
+ // Replay forward from cycle start. Track running streak so that crossing a
+ // milestone (21/66/90) refreshes the slip allowance. Two misses between
+ // milestones resets the cycle to the day after the 2nd miss.
+ let misses=0,lastMiss=null,run=0,lastTier=0;
+ let k=cs;
+ while(daysBetween(k,today)>=0){
+  const pendingToday=(k===today&&h.type==='build'&&h.log[k]!==true);
+  if(!pendingToday){
+   if(isMissStrict(h,k)){
+    misses++;lastMiss=k;run=0;
+    if(misses>=2){ // second miss in this tier → reset cycle to day after this miss
+     cs=addDays(k,1);misses=0;lastMiss=null;run=0;lastTier=0;
+    }
+   }else{
+    run++;
+    // crossed into a new milestone tier → forgive the one slip used in the prior tier
+    const tier=MILESTONES.filter(m=>run>=m).length;
+    if(tier>lastTier){lastTier=tier;misses=0;lastMiss=null;}
+   }
+  }
+  if(k===today)break;
+  k=addDays(k,1);
+ }
+ // streak = consecutive passes ending today (within current cs), today pending for build doesn't break it
+ let streak=0;k=today;
+ while(daysBetween(cs,k)>=0){
+  if(k===today&&h.type==='build'&&h.log[k]!==true){k=addDays(k,-1);continue;} // pending today, skip
+  if(isPass(h,k))streak++;else break;
+  k=addDays(k,-1);
+ }
+ // counts within cycle
+ let total=Math.max(0,daysBetween(cs,today)),passDays=0;
+ for(let kk=cs;daysBetween(kk,today)>=0;kk=addDays(kk,1)){if(isPass(h,kk)&&!(kk===today&&h.type==='build'&&h.log[kk]!==true))passDays++;if(kk===today)break;}
+ return {cycleStart:cs,streak,misses,lastMiss,total};
+}
+// strict miss used in replay: a past day that failed. Today: build-pending is NOT a miss, quit-slip IS.
+function isMissStrict(h,k){
+ const today=todayKey();
+ if(h.type==='build'){
+  if(k===today)return false; // can still do it today
+  return h.log[k]!==true;
+ } else {
+  return h.log[k]===true; // slip logged
+ }
+}
+
+// Persist a detected cycle reset back onto the habit (so it's stable), called during render
+function syncCycle(h){
+ const r=evalHabit(h);
+ if(r.cycleStart!==(h.cycleStart||h.start)){h.cycleStart=r.cycleStart;save();}
+ return r;
+}
+
+function currentMilestone(streak){
+ let hit=0,next=MILESTONES[0];
+ for(const m of MILESTONES){if(streak>=m)hit=m;}
+ next=MILESTONES.find(m=>m>streak)||null;
+ return {hit,next};
+}
+/* ===== Actions ===== */
+function logBuild(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();
+ if(h.log[k]===true){delete h.log[k];save();render();toast('Unmarked today');return;}
+ h.log[k]=true;save();render();
+ const r=evalHabit(h);celebrate(h,r.streak);}
+function openSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();
+ if(h.log[k]===true){ // already slipped today -> allow undo
+  sheet(`<h2>Undo today's slip?</h2><p class="muted">You logged a slip for ${esc(h.name)} today. Remove it?</p>
+  <div class="act"><button class="btn build" onclick="undoSlip('${id}')">Yes, undo it</button><button class="btn" onclick="closeSheet()">Keep it</button></div>`);
+  return;}
+ sheet(`<h2>Log a slip — ${esc(h.name)}</h2><p class="muted" style="margin:4px 0 0">One slip is human. Two in this cycle resets the streak. What triggered it? (optional)</p>
+ <div class="reasons" id="rz">${QUIT_REASONS.map(r=>`<button onclick="pickReason(this,'${r}')">${r}</button>`).join('')}</div>
+ <input type="hidden" id="slipReason" value="">
+ <div class="act" style="margin-top:16px"><button class="btn quit" onclick="confirmSlip('${id}')">Log the slip</button><button class="btn" onclick="closeSheet()">Cancel</button></div>`);}
+function pickReason(btn,r){document.querySelectorAll('#rz button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');document.getElementById('slipReason').value=r;}
+function confirmSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();const r=v('slipReason');
+ h.log[k]=true;if(r){h.reasons=h.reasons||{};h.reasons[k]=r;}
+ const before=evalHabit(h);
+ save();closeSheet();render();
+ const after=evalHabit(h);
+ if(after.cycleStart===todayKey())toast('Streak reset — second slip this cycle. Day 1 again.');
+ else toast('Logged. One slip used this cycle — don\'t slip again.');}
+function undoSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();delete h.log[k];if(h.reasons)delete h.reasons[k];save();closeSheet();render();toast('Slip removed');}
+
+function celebrate(h,streak){
+ const {hit}=currentMilestone(streak);
+ if(MILESTONES.includes(streak)){toast(`🎉 ${streak} days — ${M_LABEL[streak]}!`);}
+ else toast(`✓ Logged — ${streak} day${streak!==1?'s':''}`);
+}
+
+/* ===== Add / edit habit ===== */
+function openAdd(type){editHabit(null,type||'build');}
+function editHabit(id,forceType){const h=id?S.habits.find(x=>x.id===id):null;
+ const type=h?h.type:(forceType||'build');
+ const emoji=h?h.emoji:(type==='quit'?'🚫':'💪');
+ sheet(`<h2>${id?'Edit habit':'New habit'}</h2>
+ <label>Type</label>
+ <div class="seg" id="typeSeg">
+  <button class="${type==='build'?'on build':''}" onclick="setType('build')">✅ Build (do it)</button>
+  <button class="${type==='quit'?'on quit':''}" onclick="setType('quit')">🚫 Quit (don't do it)</button>
+ </div>
+ <input type="hidden" id="h_type" value="${type}">
+ <div class="hint" id="typeHint">${typeHintText(type)}</div>
+ <label>Name</label><input id="h_name" value="${esc(h?h.name:'')}" placeholder="${type==='quit'?'e.g. Smoking, Phone in bed':'e.g. Workout, Read 20 min'}" autocomplete="off">
+ <label>Icon</label>
+ <div class="emojibar" id="emojibar">${EMOJIS.map(e=>`<button class="${e===emoji?'on':''}" onclick="pickEmoji('${e}')">${e}</button>`).join('')}</div>
+ <input type="hidden" id="h_emoji" value="${emoji}">
+ ${id?`<label>Start date</label><input type="date" id="h_start" value="${h.start}"><div class="muted">Changing this recalculates the streak.</div>`:''}
+ <div class="act" style="margin-top:18px"><button class="btn p" onclick="saveHabit(${id?`'${id}'`:'null'})">${id?'Save':'Create habit'}</button>${id?`<button class="btn d" style="flex:none" onclick="delHabit('${id}')">Delete</button>`:''}<button class="btn" style="flex:none" onclick="closeSheet()">Cancel</button></div>`);}
+function typeHintText(t){return t==='build'
+ ? 'You log it each day you do it. Miss a day with no log = a miss. Two misses in a 21-day cycle resets the streak.'
+ : 'Clean days pass automatically — you only tap when you slip. Two slips in a 21-day cycle resets the streak.';}
+function setType(t){document.getElementById('h_type').value=t;
+ document.querySelectorAll('#typeSeg button').forEach(b=>b.className='');
+ document.querySelectorAll('#typeSeg button')[t==='build'?0:1].className='on '+t;
+ document.getElementById('typeHint').textContent=typeHintText(t);
+ const cur=document.getElementById('h_emoji').value;
+ if((t==='quit'&&cur==='💪')||(t==='build'&&cur==='🚫'))pickEmoji(t==='quit'?'🚫':'💪');}
+function pickEmoji(e){document.getElementById('h_emoji').value=e;document.querySelectorAll('#emojibar button').forEach(b=>b.classList.toggle('on',b.textContent===e));}
+function saveHabit(id){const name=v('h_name').trim();if(!name)return toast('Give it a name');
+ const type=v('h_type'),emoji=v('h_emoji');
+ if(id){const h=S.habits.find(x=>x.id===id);const oldStart=h.start;
+  h.name=name;h.type=type;h.emoji=emoji;
+  const ns=document.getElementById('h_start');if(ns&&ns.value){h.start=ns.value;if(h.start!==oldStart)h.cycleStart=h.start;}
+  // if start moved after some cycleStart, clamp
+  if(daysBetween(h.start,h.cycleStart||h.start)<0)h.cycleStart=h.start;
+ }else{
+  const k=todayKey();
+  S.habits.push({id:uid(),type,name,emoji,start:k,cycleStart:k,createdAt:Date.now(),log:{},reasons:{},order:S.habits.length});
+ }
+ save();closeSheet();render();toast(id?'Saved':'Habit created — day 0 starts today');}
+function delHabit(id){const h=S.habits.find(x=>x.id===id);if(!confirm(`Delete "${h.name}" and all its history? This can't be undone.`))return;
+ S.habits=S.habits.filter(x=>x.id!==id);save();closeSheet();render();toast('Deleted');}
+
+/* ===== Reorder ===== */
+let dragId=null;
+function reorder(id,dir){const arr=S.habits.slice().sort((a,b)=>(a.order??0)-(b.order??0));
+ const i=arr.findIndex(x=>x.id===id);const j=i+dir;if(j<0||j>=arr.length)return;
+ [arr[i].order,arr[j].order]=[arr[j].order??j,arr[i].order??i];
+ const tmp=arr[i].order;arr[i].order=arr[j].order;arr[j].order=tmp;
+ save();render();}
+/* ===== Views ===== */
+function sortedHabits(){return S.habits.slice().sort((a,b)=>(a.order??0)-(b.order??0));}
+
+function habitCard(h){
+ const r=syncCycle(h);const today=todayKey();
+ const doneToday=h.type==='build'&&h.log[today]===true;
+ const slippedToday=h.type==='quit'&&h.log[today]===true;
+ const {hit,next}=currentMilestone(r.streak);
+ const pct=next?Math.min(100,r.streak/next*100):100;
+ const col=h.type==='build'?'var(--build)':'var(--quit)';
+ // status chip
+ let chip='';
+ if(r.streak>=90)chip=`<span class="chip gold">🔒 Locked · 90+</span>`;
+ else if(r.misses>=1)chip=`<span class="chip warn">⚠ 1 slip used · ${1} left</span>`;
+ else if(MILESTONES.includes(r.streak))chip=`<span class="chip gold">🎉 ${M_LABEL[r.streak]}</span>`;
+ else chip=`<span class="chip ok">clean cycle</span>`;
+ // mini dots: last 21 of current cycle (or since start)
+ const dots=cycleDots(h,r);
+ // action row
+ let actions;
+ if(h.type==='build'){
+  actions=`<button class="btn build ${doneToday?'ghost':''}" onclick="logBuild('${h.id}')">${doneToday?'✓ Done today — tap to undo':'Mark done today'}</button>`;
+ }else{
+  actions=slippedToday
+   ? `<button class="btn quit ghost" onclick="openSlip('${h.id}')">✗ Slipped today — tap to undo</button>`
+   : `<button class="btn quit ghost" onclick="openSlip('${h.id}')">I slipped</button><button class="btn build" style="flex:none;pointer-events:none;opacity:.7">✓ Clean so far</button>`;
+ }
+ const cls=doneToday?'done':(slippedToday?'slipped':'');
+ const sub=h.type==='build'
+  ? (doneToday?'Logged for today':'Not logged yet today')
+  : (slippedToday?'Slip logged today':'Passing automatically');
+ return `<div class="hcard ${cls}">
+  <div class="top">
+   <span class="emoji">${h.emoji}</span>
+   <div style="min-width:0"><div class="nm">${esc(h.name)}</div><div class="sub">${sub}</div></div>
+   <div class="streak"><div class="n" style="color:${col}">${r.streak}</div><div class="lbl">day streak</div></div>
+  </div>
+  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${chip}${hit?`<span class="chip">best: ${hit}+</span>`:''}<button class="btn sm" style="flex:none;margin-left:auto" onclick="editHabit('${h.id}')">⋯</button></div>
+  <div class="prog">
+   <div class="track"><div class="fill" style="width:${pct}%;background:${col}"></div></div>
+   <div class="milestones">${MILESTONES.map(m=>`<span class="${r.streak>=m?'hit':''}">${m}${r.streak>=m?' ✓':''}</span>`).join('')}</div>
+  </div>
+  ${dots}
+  <div class="act">${actions}</div>
+ </div>`;
+}
+function cycleDots(h,r){
+ // show the current cycle's days up to 21, marking pass/slip/today/future
+ const today=todayKey();const cs=r.cycleStart;
+ const span=Math.max(21,r.total+1);const n=Math.min(span,42);
+ let out='<div class="dots">';
+ for(let i=0;i<n;i++){const k=addDays(cs,i);const diff=daysBetween(today,k);
+  let c='';
+  if(diff>0)c='future';
+  else if(h.type==='build'){c=h.log[k]===true?'pass':(k===today?'today':'slip');if(k===today&&h.log[k]!==true)c='today';else if(k===today&&h.log[k]===true)c='pass today';}
+  else{c=h.log[k]===true?'slip':'pass';if(k===today)c+=' today';}
+  if(k===today&&!c.includes('today'))c+=' today';
+  out+=`<i class="${c}" title="${k}"></i>`;
+ }
+ out+='</div>';return out;
+}
+
+function vToday(){
+ const hs=sortedHabits();
+ if(!hs.length){
+  return `<div class="empty">No habits yet.<br><br>Add one you want to <b style="color:var(--build)">build</b> (log it daily) or one you want to <b style="color:var(--quit)">quit</b> (clean days pass on their own).<br><br>The goal: reach 21 days, then 66, then 90.</div>
+  <button class="btn build wide" style="margin-bottom:10px" onclick="openAdd('build')">+ Build a habit</button>
+  <button class="btn quit wide" onclick="openAdd('quit')">+ Quit a habit</button>`;
+ }
+ const build=hs.filter(h=>h.type==='build'),quit=hs.filter(h=>h.type==='quit');
+ let out='';
+ if(build.length){out+=`<div class="eyebrow"><span class="dot" style="background:var(--build)"></span>Build — log when done</div>`+build.map(habitCard).join('');}
+ if(quit.length){out+=`<div class="eyebrow"><span class="dot" style="background:var(--quit)"></span>Quit — tap only if you slip</div>`+quit.map(habitCard).join('');}
+ out+=`<div class="row" style="gap:8px;margin-top:16px"><button class="btn build" onclick="openAdd('build')">+ Build</button><button class="btn quit" onclick="openAdd('quit')">+ Quit</button></div>`;
+ return out;
+}
+
+/* ===== Progress view ===== */
+function vProgress(){
+ const hs=sortedHabits();
+ if(!hs.length)return `<div class="empty">Nothing to show yet — add a habit first.</div>`;
+ // summary stats
+ let active=hs.length,atMilestone=0,best=0,inWarn=0;
+ hs.forEach(h=>{const r=evalHabit(h);if(r.streak>best)best=r.streak;if(MILESTONES.includes(r.streak)||r.streak>=90)atMilestone++;if(r.misses>=1)inWarn++;});
+ let out=`<div class="stat">
+  <div class="box"><div class="n">${active}</div><div class="l">habits</div></div>
+  <div class="box"><div class="n" style="color:var(--build)">${best}</div><div class="l">best streak</div></div>
+  <div class="box"><div class="n" style="color:${inWarn?'var(--warn)':'var(--muted)'}">${inWarn}</div><div class="l">on warning</div></div>
+ </div>`;
+ out+=`<h2 class="sec">Each habit</h2>`;
+ out+=hs.map(h=>{const r=evalHabit(h);const col=h.type==='build'?'var(--build)':'var(--quit)';
+  const {next}=currentMilestone(r.streak);
+  return `<div class="card"><div class="row"><span style="font-size:22px">${h.emoji}</span><div><div style="font-weight:700">${esc(h.name)}</div><div class="muted">${h.type==='build'?'Build':'Quit'} · since ${fmtShort(h.start)}</div></div><div class="sp"></div><div style="text-align:right"><div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${col}">${r.streak}</div><div class="muted" style="font-size:10px">${next?next-r.streak+' to '+next:'locked'}</div></div></div>
+   ${monthCal(h)}
+   <div class="muted" style="margin-top:8px">${streakLine(h,r)}</div>
+  </div>`;
+ }).join('');
+ return out;
+}
+function fmtShort(k){return keyToDate(k).toLocaleDateString([],{month:'short',day:'numeric'})}
+function streakLine(h,r){
+ const total=daysBetween(h.start,todayKey())+1;
+ let passed=0,slipped=0;
+ for(let k=h.start;daysBetween(k,todayKey())>=0;k=addDays(k,1)){
+  if(h.type==='quit'){if(h.log[k]===true)slipped++;else passed++;}
+  else{if(h.log[k]===true)passed++;else if(k!==todayKey())slipped++;}
+  if(k===todayKey())break;
+ }
+ if(h.type==='quit')return `${passed} clean days · ${slipped} slip${slipped!==1?'s':''} over ${total} days tracked`;
+ return `${passed} done · ${slipped} missed over ${total} days tracked`;
+}
+function monthCal(h){
+ // last 5 weeks grid
+ const today=todayKey();const start=addDays(today,-34);
+ // align to week start (Mon)
+ let d0=keyToDate(start);const dow=(d0.getDay()+6)%7;d0.setDate(d0.getDate()-dow);
+ const hd=['M','T','W','T','F','S','S'];
+ let out='<div class="cal">'+hd.map(x=>`<div class="hd">${x}</div>`).join('');
+ for(let i=0;i<35;i++){const dd=new Date(d0);dd.setDate(dd.getDate()+i);const k=dayKey(dd);
+  const future=daysBetween(today,k)>0;const before=daysBetween(h.start,k)<0;
+  let c='';let label=dd.getDate();
+  if(future||before){c='';}
+  else if(h.type==='quit'){c=h.log[k]===true?'slip':'pass';}
+  else{c=h.log[k]===true?'pass':(k===today?'':'slip');}
+  if(k===today)c+=' today';
+  out+=`<div class="d ${c}" title="${k}" ${future||before?'style="opacity:.25"':''}>${label}</div>`;
+ }
+ out+='</div>';return out;
+}
+
+/* ===== Settings ===== */
+function openSettings(){
+ sheet(`<h2>Settings</h2><p class="muted" style="margin:4px 0 0">Stored ${store.mode()==='artifact'?'in this artifact':'on this device only'} · ${S.habits.length} habits · no account, no cloud.</p>
+ <div class="hint" style="margin-top:14px"><b>The rules</b><br>• Build habit: log it each day you do it. A missed day (no log) is a miss.<br>• Quit habit: clean days pass automatically — tap only when you slip.<br>• <b>2 misses in one 21-day cycle → streak resets to 0.</b> One slip is forgiven.<br>• The slip count refreshes at each milestone (21 → 66 → 90).<br>• Milestones: 21 = established, 66 = automatic, 90 = locked.</div>
+ <h2 class="sec" style="margin-top:20px">Your data</h2>
+ <div class="row" style="gap:8px"><button class="btn" onclick="exportData('json')">Export backup</button><button class="btn" onclick="exportData('csv')">Export CSV</button></div>
+ <label>Restore from backup</label><input type="file" accept=".json,application/json" onchange="importFile(this)">
+ <button class="btn d wide" style="margin-top:22px" onclick="wipe()">Delete all data</button>
+ <div style="height:14px"></div><button class="btn wide" onclick="closeSheet()">Close</button>`);}
+
+function exportData(kind){
+ let txt,name;
+ if(kind==='csv'){
+  const rows=[['habit','type','date','status','reason']];
+  sortedHabits().forEach(h=>{for(let k=h.start;daysBetween(k,todayKey())>=0;k=addDays(k,1)){
+   let st;if(h.type==='quit')st=h.log[k]===true?'slip':'clean';else st=h.log[k]===true?'done':(k===todayKey()?'pending':'missed');
+   rows.push([h.name,h.type,k,st,(h.reasons&&h.reasons[k])||'']);if(k===todayKey())break;}});
+  txt=rows.map(r=>r.map(x=>{x=String(x);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x}).join(',')).join('\n');name=`streaks-${todayKey()}.csv`;
+ }else{txt=JSON.stringify(S,null,1);name=`streaks-${todayKey()}.json`;}
+ sheet(`<h2>Export ${kind.toUpperCase()}</h2><p class="muted">${S.habits.length} habits. Download or copy.</p>
+ <button class="btn p wide" onclick="dl('${name}')">Download ${name}</button>
+ <button class="btn wide" style="margin-top:10px" onclick="navigator.clipboard.writeText(document.getElementById('exp').value).then(()=>toast('Copied'),()=>toast('Select and copy manually'))">Copy to clipboard</button>
+ <textarea id="exp" rows="9" style="margin-top:10px;font-family:var(--mono);font-size:11px">${esc(txt)}</textarea>
+ <button class="btn wide" style="margin-top:10px" onclick="openSettings()">Back</button>`);}
+function dl(name){const txt=document.getElementById('exp').value,b=new Blob([txt],{type:'text/plain'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);}
+function importFile(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.habits))throw 0;if(!confirm(`Replace current data with this backup (${d.habits.length} habits)?`))return;S={v:1,habits:d.habits,settings:d.settings||{}};save();closeSheet();render();toast('Backup restored')}catch(e){toast('Not a valid Streaks backup')}};r.readAsText(f);}
+function wipe(){if(!confirm('Delete ALL habits and history?'))return;if(!confirm('This cannot be undone. Export first? Cancel to go back.'))return;S={v:1,habits:[],settings:{}};save();closeSheet();render();toast('All data deleted');}
+
+/* ===== Shell ===== */
+const TABS=[['today','◎','Today'],['progress','▦','Progress']];
+function renderNav(){document.getElementById('nav').innerHTML=TABS.map(([t,i,n])=>`<button data-t="${t}" onclick="tab='${t}';render()"><span class="i">${i}</span>${n}</button>`).join('');}
+function render(){
+ document.getElementById('hdate').textContent=fmtDate();
+ document.getElementById('view').innerHTML={today:vToday,progress:vProgress}[tab]();
+ document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+}
+async function init(){const d=await store.load();if(d){S={...S,...d};S.settings=S.settings||{};}
+ // migrate: ensure fields
+ S.habits.forEach((h,i)=>{if(h.order==null)h.order=i;if(!h.cycleStart)h.cycleStart=h.start;if(!h.log)h.log={};});
+ renderNav();render();
+ // re-render at midnight so "today" rolls over
+ setInterval(()=>{if(document.getElementById('hdate').textContent!==fmtDate())render();},60000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)render();});
+ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+init();
+
+</script>
+</body>
+</html>
