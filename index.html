@@ -62,8 +62,8 @@ nav button .i{font-size:20px;line-height:1.1}nav button.on{color:var(--accent)}
 .chip.danger{background:rgba(255,111,97,.15);color:var(--quit)}
 .chip.gold{background:rgba(242,184,75,.15);color:var(--gold)}
 .chip.ok{background:rgba(63,201,160,.15);color:var(--build)}
-.dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:12px}
-.dots i{width:13px;height:13px;border-radius:3px;background:var(--panel2);display:inline-block}
+.dots{display:grid;grid-template-columns:repeat(21,1fr);gap:3px;margin-top:12px}
+.dots i{aspect-ratio:1;border-radius:3px;background:var(--panel2);display:block;min-width:0}
 .dots i.pass{background:var(--build)}
 .dots i.slip{background:var(--quit)}
 .dots i.today{outline:2px solid var(--text);outline-offset:1px}
@@ -156,13 +156,13 @@ function closeSheet(){document.getElementById('sheet').classList.remove('open')}
 /* ===== Habit model =====
  habit = {id,type:'build'|'quit',name,emoji,start(dayKey),createdAt,
           log:{dayKey:true}   // build: true=did it; quit: true=slipped
-          cycleStart(dayKey)  // current 21-day cycle anchor; resets on 2nd miss
           reasons:{dayKey:'Stress'} }
- Logic:
-  - build: a day PASSES if log[day]===true. A day is a MISS if it's a past day with no true log.
-  - quit:  a day PASSES by default. A day is a SLIP(miss) if log[day]===true.
-  - streak = consecutive passing days ending today (counting back).
-  - cycle = since cycleStart. 2 misses within the active cycle => reset cycleStart to today, streak 0.
+ Rule: NEVER MISS TWICE.
+  - build: a day PASSES if log[day]===true. A past day without a log is a MISS. Today is pending until logged.
+  - quit:  a day PASSES by default. A day with a logged slip is a MISS.
+  - One miss never breaks the streak (it just doesn't add a day).
+  - Two misses on consecutive days reset the streak to 0; the new run starts the day after the 2nd miss.
+  - streak = days passed in the current run. Replayed from h.start every time, so history always follows the rule.
 */
 
 function isPass(h,k){
@@ -175,64 +175,41 @@ function isMiss(h,k){
  if(h.type==='build')return h.log[k]!==true;
  return h.log[k]===true; // quit slip
 }
+// a miss as used in the replay: a past day that failed. Today: build-pending is NOT a miss, quit-slip IS.
+function isMissStrict(h,k){
+ if(h.type==='build'){
+  if(k===todayKey())return false; // can still do it today
+  return h.log[k]!==true;
+ }
+ return h.log[k]===true; // slip logged
+}
 
-// Walk from cycleStart to today, applying the "2 misses within cycle = reset" rule.
-// Returns {cycleStart, streak, missesThisCycle, lastMissKey, totalDays, passDays}
+// Returns {runStart, streak, lastMiss, missedYesterday, missedToday, resetToday}
 function evalHabit(h){
  const today=todayKey();
- let cs=h.cycleStart||h.start;
- if(daysBetween(cs,today)<0)cs=today; // safety
- // Replay forward from cycle start. Track running streak so that crossing a
- // milestone (21/66/90) refreshes the slip allowance. Two misses between
- // milestones resets the cycle to the day after the 2nd miss.
- let misses=0,lastMiss=null,run=0,lastTier=0;
- let k=cs;
+ let runStart=h.start,streak=0,lastMiss=null,prevMiss=false,lastReset=null;
+ let k=h.start;
  while(daysBetween(k,today)>=0){
-  const pendingToday=(k===today&&h.type==='build'&&h.log[k]!==true);
-  if(!pendingToday){
+  const pending=(k===today&&h.type==='build'&&h.log[k]!==true);
+  if(!pending){
    if(isMissStrict(h,k)){
-    misses++;lastMiss=k;run=0;
-    if(misses>=2){ // second miss in this tier → reset cycle to day after this miss
-     cs=addDays(k,1);misses=0;lastMiss=null;run=0;lastTier=0;
-    }
-   }else{
-    run++;
-    // crossed into a new milestone tier → forgive the one slip used in the prior tier
-    const tier=MILESTONES.filter(m=>run>=m).length;
-    if(tier>lastTier){lastTier=tier;misses=0;lastMiss=null;}
-   }
+    if(prevMiss){ // second miss in a row → reset; new run starts the next day
+     runStart=addDays(k,1);streak=0;lastMiss=null;prevMiss=false;lastReset=k;
+    }else{prevMiss=true;lastMiss=k;}
+   }else{streak++;prevMiss=false;}
   }
   if(k===today)break;
   k=addDays(k,1);
  }
- // streak = consecutive passes ending today (within current cs), today pending for build doesn't break it
- let streak=0;k=today;
- while(daysBetween(cs,k)>=0){
-  if(k===today&&h.type==='build'&&h.log[k]!==true){k=addDays(k,-1);continue;} // pending today, skip
-  if(isPass(h,k))streak++;else break;
-  k=addDays(k,-1);
- }
- // counts within cycle
- let total=Math.max(0,daysBetween(cs,today)),passDays=0;
- for(let kk=cs;daysBetween(kk,today)>=0;kk=addDays(kk,1)){if(isPass(h,kk)&&!(kk===today&&h.type==='build'&&h.log[kk]!==true))passDays++;if(kk===today)break;}
- return {cycleStart:cs,streak,misses,lastMiss,total};
+ return {runStart,streak,lastMiss,
+  missedYesterday:lastMiss===addDays(today,-1),
+  missedToday:lastMiss===today,
+  resetToday:lastReset===today};
 }
-// strict miss used in replay: a past day that failed. Today: build-pending is NOT a miss, quit-slip IS.
-function isMissStrict(h,k){
- const today=todayKey();
- if(h.type==='build'){
-  if(k===today)return false; // can still do it today
-  return h.log[k]!==true;
- } else {
-  return h.log[k]===true; // slip logged
- }
-}
-
-// Persist a detected cycle reset back onto the habit (so it's stable), called during render
-function syncCycle(h){
- const r=evalHabit(h);
- if(r.cycleStart!==(h.cycleStart||h.start)){h.cycleStart=r.cycleStart;save();}
- return r;
+// Streak is one miss away from resetting: missed yesterday and today not safe yet, or slipped today.
+function atRisk(h,r){
+ const doneToday=h.type==='build'&&h.log[todayKey()]===true;
+ return (r.missedYesterday&&!doneToday)||r.missedToday;
 }
 
 function currentMilestone(streak){
@@ -251,18 +228,17 @@ function openSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();
   sheet(`<h2>Undo today's slip?</h2><p class="muted">You logged a slip for ${esc(h.name)} today. Remove it?</p>
   <div class="act"><button class="btn build" onclick="undoSlip('${id}')">Yes, undo it</button><button class="btn" onclick="closeSheet()">Keep it</button></div>`);
   return;}
- sheet(`<h2>Log a slip — ${esc(h.name)}</h2><p class="muted" style="margin:4px 0 0">One slip is human. Two in this cycle resets the streak. What triggered it? (optional)</p>
+ sheet(`<h2>Log a slip — ${esc(h.name)}</h2><p class="muted" style="margin:4px 0 0">One slip won't break the streak — two days in a row will. What triggered it? (optional)</p>
  <div class="reasons" id="rz">${QUIT_REASONS.map(r=>`<button onclick="pickReason(this,'${r}')">${r}</button>`).join('')}</div>
  <input type="hidden" id="slipReason" value="">
  <div class="act" style="margin-top:16px"><button class="btn quit" onclick="confirmSlip('${id}')">Log the slip</button><button class="btn" onclick="closeSheet()">Cancel</button></div>`);}
 function pickReason(btn,r){document.querySelectorAll('#rz button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');document.getElementById('slipReason').value=r;}
 function confirmSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();const r=v('slipReason');
  h.log[k]=true;if(r){h.reasons=h.reasons||{};h.reasons[k]=r;}
- const before=evalHabit(h);
  save();closeSheet();render();
  const after=evalHabit(h);
- if(after.cycleStart===todayKey())toast('Streak reset — second slip this cycle. Day 1 again.');
- else toast('Logged. One slip used this cycle — don\'t slip again.');}
+ if(after.resetToday)toast('Streak reset — 2 slips in a row. Fresh start tomorrow.');
+ else toast('Logged. Streak is safe — just don\'t slip again tomorrow.');}
 function undoSlip(id){const h=S.habits.find(x=>x.id===id);const k=todayKey();delete h.log[k];if(h.reasons)delete h.reasons[k];save();closeSheet();render();toast('Slip removed');}
 
 function celebrate(h,streak){
@@ -291,8 +267,8 @@ function editHabit(id,forceType){const h=id?S.habits.find(x=>x.id===id):null;
  ${id?`<label>Start date</label><input type="date" id="h_start" value="${h.start}"><div class="muted">Changing this recalculates the streak.</div>`:''}
  <div class="act" style="margin-top:18px"><button class="btn p" onclick="saveHabit(${id?`'${id}'`:'null'})">${id?'Save':'Create habit'}</button>${id?`<button class="btn d" style="flex:none" onclick="delHabit('${id}')">Delete</button>`:''}<button class="btn" style="flex:none" onclick="closeSheet()">Cancel</button></div>`);}
 function typeHintText(t){return t==='build'
- ? 'You log it each day you do it. Miss a day with no log = a miss. Two misses in a 21-day cycle resets the streak.'
- : 'Clean days pass automatically — you only tap when you slip. Two slips in a 21-day cycle resets the streak.';}
+ ? 'You log it each day you do it. One missed day is forgiven — missing 2 days in a row resets the streak.'
+ : 'Clean days pass automatically — you only tap when you slip. One slip is forgiven — slipping 2 days in a row resets the streak.';}
 function setType(t){document.getElementById('h_type').value=t;
  document.querySelectorAll('#typeSeg button').forEach(b=>b.className='');
  document.querySelectorAll('#typeSeg button')[t==='build'?0:1].className='on '+t;
@@ -304,12 +280,10 @@ function saveHabit(id){const name=v('h_name').trim();if(!name)return toast('Give
  const type=v('h_type'),emoji=v('h_emoji');
  if(id){const h=S.habits.find(x=>x.id===id);const oldStart=h.start;
   h.name=name;h.type=type;h.emoji=emoji;
-  const ns=document.getElementById('h_start');if(ns&&ns.value){h.start=ns.value;if(h.start!==oldStart)h.cycleStart=h.start;}
-  // if start moved after some cycleStart, clamp
-  if(daysBetween(h.start,h.cycleStart||h.start)<0)h.cycleStart=h.start;
+  const ns=document.getElementById('h_start');if(ns&&ns.value){h.start=ns.value;}
  }else{
   const k=todayKey();
-  S.habits.push({id:uid(),type,name,emoji,start:k,cycleStart:k,createdAt:Date.now(),log:{},reasons:{},order:S.habits.length});
+  S.habits.push({id:uid(),type,name,emoji,start:k,createdAt:Date.now(),log:{},reasons:{},order:S.habits.length});
  }
  save();closeSheet();render();toast(id?'Saved':'Habit created — day 0 starts today');}
 function delHabit(id){const h=S.habits.find(x=>x.id===id);if(!confirm(`Delete "${h.name}" and all its history? This can't be undone.`))return;
@@ -326,7 +300,7 @@ function reorder(id,dir){const arr=S.habits.slice().sort((a,b)=>(a.order??0)-(b.
 function sortedHabits(){return S.habits.slice().sort((a,b)=>(a.order??0)-(b.order??0));}
 
 function habitCard(h){
- const r=syncCycle(h);const today=todayKey();
+ const r=evalHabit(h);const today=todayKey();
  const doneToday=h.type==='build'&&h.log[today]===true;
  const slippedToday=h.type==='quit'&&h.log[today]===true;
  const {hit,next}=currentMilestone(r.streak);
@@ -334,11 +308,15 @@ function habitCard(h){
  const col=h.type==='build'?'var(--build)':'var(--quit)';
  // status chip
  let chip='';
- if(r.streak>=90)chip=`<span class="chip gold">🔒 Locked · 90+</span>`;
- else if(r.misses>=1)chip=`<span class="chip warn">⚠ 1 slip used · ${1} left</span>`;
+ if(r.missedYesterday&&!doneToday)chip=h.type==='build'
+  ? `<span class="chip warn">⚠ Missed yesterday — don't miss twice</span>`
+  : `<span class="chip warn">⚠ Slipped yesterday — stay clean today</span>`;
+ else if(r.missedToday)chip=`<span class="chip warn">⚠ Slipped today — keep tomorrow clean</span>`;
+ else if(r.streak>=90)chip=`<span class="chip gold">🔒 Locked · 90+</span>`;
  else if(MILESTONES.includes(r.streak))chip=`<span class="chip gold">🎉 ${M_LABEL[r.streak]}</span>`;
- else chip=`<span class="chip ok">clean cycle</span>`;
- // mini dots: last 21 of current cycle (or since start)
+ else if(r.streak===0)chip=`<span class="chip ok">fresh start</span>`;
+ else chip=`<span class="chip ok">on track</span>`;
+ // mini dots: last 21 days
  const dots=cycleDots(h,r);
  // action row
  let actions;
@@ -369,11 +347,12 @@ function habitCard(h){
  </div>`;
 }
 function cycleDots(h,r){
- // show the current cycle's days up to 21, marking pass/slip/today/future
- const today=todayKey();const cs=r.cycleStart;
- const span=Math.max(21,r.total+1);const n=Math.min(span,42);
+ // a 21-slot window: the last 21 days (or from the start date, with future slots), marking pass/slip/today/future
+ const today=todayKey();
+ const back=addDays(today,-20);
+ const first=daysBetween(h.start,back)>0?back:h.start;
  let out='<div class="dots">';
- for(let i=0;i<n;i++){const k=addDays(cs,i);const diff=daysBetween(today,k);
+ for(let i=0;i<21;i++){const k=addDays(first,i);const diff=daysBetween(today,k);
   let c='';
   if(diff>0)c='future';
   else if(h.type==='build'){c=h.log[k]===true?'pass':(k===today?'today':'slip');if(k===today&&h.log[k]!==true)c='today';else if(k===today&&h.log[k]===true)c='pass today';}
@@ -405,7 +384,7 @@ function vProgress(){
  if(!hs.length)return `<div class="empty">Nothing to show yet — add a habit first.</div>`;
  // summary stats
  let active=hs.length,atMilestone=0,best=0,inWarn=0;
- hs.forEach(h=>{const r=evalHabit(h);if(r.streak>best)best=r.streak;if(MILESTONES.includes(r.streak)||r.streak>=90)atMilestone++;if(r.misses>=1)inWarn++;});
+ hs.forEach(h=>{const r=evalHabit(h);if(r.streak>best)best=r.streak;if(MILESTONES.includes(r.streak)||r.streak>=90)atMilestone++;if(atRisk(h,r))inWarn++;});
  let out=`<div class="stat">
   <div class="box"><div class="n">${active}</div><div class="l">habits</div></div>
   <div class="box"><div class="n" style="color:var(--build)">${best}</div><div class="l">best streak</div></div>
@@ -455,7 +434,7 @@ function monthCal(h){
 /* ===== Settings ===== */
 function openSettings(){
  sheet(`<h2>Settings</h2><p class="muted" style="margin:4px 0 0">Stored ${store.mode()==='artifact'?'in this artifact':'on this device only'} · ${S.habits.length} habits · no account, no cloud.</p>
- <div class="hint" style="margin-top:14px"><b>The rules</b><br>• Build habit: log it each day you do it. A missed day (no log) is a miss.<br>• Quit habit: clean days pass automatically — tap only when you slip.<br>• <b>2 misses in one 21-day cycle → streak resets to 0.</b> One slip is forgiven.<br>• The slip count refreshes at each milestone (21 → 66 → 90).<br>• Milestones: 21 = established, 66 = automatic, 90 = locked.</div>
+ <div class="hint" style="margin-top:14px"><b>The rules</b><br>• Build habit: log it each day you do it. A missed day (no log) is a miss.<br>• Quit habit: clean days pass automatically — tap only when you slip.<br>• <b>Never miss twice.</b> One missed day (or one slip) never breaks the streak. <b>2 in a row → streak resets to 0.</b><br>• The streak counts days actually done (or clean) — a forgiven miss just doesn't add a day.<br>• Milestones: 21 = established, 66 = automatic, 90 = locked.</div>
  <h2 class="sec" style="margin-top:20px">Your data</h2>
  <div class="row" style="gap:8px"><button class="btn" onclick="exportData('json')">Export backup</button><button class="btn" onclick="exportData('csv')">Export CSV</button></div>
  <label>Restore from backup</label><input type="file" accept=".json,application/json" onchange="importFile(this)">
@@ -490,7 +469,7 @@ function render(){
 }
 async function init(){const d=await store.load();if(d){S={...S,...d};S.settings=S.settings||{};}
  // migrate: ensure fields
- S.habits.forEach((h,i)=>{if(h.order==null)h.order=i;if(!h.cycleStart)h.cycleStart=h.start;if(!h.log)h.log={};});
+ S.habits.forEach((h,i)=>{if(h.order==null)h.order=i;if(!h.log)h.log={};});
  renderNav();render();
  // re-render at midnight so "today" rolls over
  setInterval(()=>{if(document.getElementById('hdate').textContent!==fmtDate())render();},60000);
